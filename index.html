@@ -25,7 +25,7 @@
     <div class="card stats"><div id="score">Crystals: 0 / 8</div><div id="status">Explore the world</div></div>
   </div>
   <div id="message">Collect every crystal, then enter the glowing portal!</div>
-  <div class="card help">WASD / arrows: move &nbsp; • &nbsp; Space: jump &nbsp; • &nbsp; R: restart</div>
+  <div class="card help">WASD / arrows: move &nbsp; • &nbsp; Shift: sprint &nbsp; • &nbsp; Space: jump &nbsp; • &nbsp; R: restart</div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
   <script>
     const canvas = document.getElementById("game");
@@ -110,7 +110,10 @@
     let grounded = true;
     let won = false;
     const clock = new THREE.Clock();
-    const playerSpeed = 8;
+    const baseSpeed = 8;
+    const baseFov = 60;
+    const sprintFov = 90;
+    let sprintBlend = 0;
 
     function reset() {
       player.position.set(0, 0, 18); velocityY = 0; grounded = true; won = false;
@@ -134,10 +137,18 @@
     }
     function update(dt) {
       if (won) return;
+      const sprintTarget = keys.Shift ? 1 : 0;
+      sprintBlend += (sprintTarget - sprintBlend) * (1 - Math.pow(0.0001, dt));
+      const currentFov = baseFov + (sprintFov - baseFov) * sprintBlend;
+      if (Math.abs(camera.fov - currentFov) > 0.01) {
+        camera.fov = currentFov;
+        camera.updateProjectionMatrix();
+      }
+      const currentSpeed = baseSpeed * (1 + sprintBlend);
       let x = 0; let z = 0;
       if (keys.ArrowLeft || keys.a) x -= 1; if (keys.ArrowRight || keys.d) x += 1; if (keys.ArrowUp || keys.w) z -= 1; if (keys.ArrowDown || keys.s) z += 1;
       const length = Math.hypot(x, z) || 1;
-      if (x || z) { x /= length; z /= length; player.position.x += x * playerSpeed * dt; player.position.z += z * playerSpeed * dt; player.rotation.y = Math.atan2(x, z); }
+      if (x || z) { x /= length; z /= length; player.position.x += x * currentSpeed * dt; player.position.z += z * currentSpeed * dt; player.rotation.y = Math.atan2(x, z); }
       player.position.x = Math.max(-46, Math.min(46, player.position.x)); player.position.z = Math.max(-46, Math.min(46, player.position.z));
       velocityY -= 24 * dt; player.position.y += velocityY * dt;
       if (velocityY <= 0 && onPlatform(player.position.x, player.position.z, player.position.y)) { player.position.y = platforms.find(function (p) { return Math.abs(player.position.x - p.x) < p.w / 2 - 0.45 && Math.abs(player.position.z - p.z) < p.d / 2 - 0.45 && player.position.y <= p.top + 0.12 && player.position.y >= p.top - 0.55; }).top; velocityY = 0; grounded = true; } else { grounded = false; }
