@@ -3,99 +3,165 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Blocky Adventure</title>
+  <title>Blocky Adventure 3D</title>
   <style>
-    :root { --ink: #17233c; --blue: #4f7cff; --gold: #ffd447; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; color: var(--ink); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: linear-gradient(135deg, #e9f7ff, #c7d7ff 55%, #ffdff0); display: grid; place-items: center; padding: 24px; }
-    .shell { width: min(1100px, 100%); }
-    .topbar, .help { background: rgba(255,255,255,.88); border: 3px solid var(--ink); box-shadow: 8px 8px 0 rgba(23,35,60,.18); }
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; border-radius: 18px 18px 10px 10px; flex-wrap: wrap; }
-    .brand { font-weight: 950; letter-spacing: .08em; font-size: clamp(18px, 3vw, 28px); }
-    .stats { display: flex; gap: 10px; flex-wrap: wrap; font-weight: 800; }
-    .pill { padding: 8px 12px; border-radius: 999px; background: #fff4ac; border: 2px solid var(--ink); }
-    .game-wrap { position: relative; margin-top: 14px; }
-    canvas { display: block; width: 100%; height: auto; border: 5px solid var(--ink); border-radius: 14px; background: #9edcff; box-shadow: 10px 10px 0 rgba(23,35,60,.2); image-rendering: pixelated; }
-    .message { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); background: rgba(23,35,60,.92); color: white; padding: 10px 16px; border-radius: 999px; font-weight: 800; text-align: center; pointer-events: none; }
-    .help { margin-top: 14px; padding: 12px 16px; border-radius: 10px 10px 18px 18px; font-weight: 700; text-align: center; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #8fd8ff; color: #17233c; }
+    #game { width: 100vw; height: 100vh; display: block; }
+    .hud { position: fixed; inset: 18px 18px auto 18px; z-index: 2; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none; }
+    .card { background: rgba(255,255,255,.9); border: 3px solid #17233c; border-radius: 16px; padding: 12px 16px; box-shadow: 6px 6px 0 rgba(23,35,60,.2); }
+    .title { font-weight: 950; letter-spacing: .08em; font-size: clamp(18px, 3vw, 28px); }
+    .subtitle { margin-top: 3px; font-weight: 700; opacity: .75; }
+    .stats { font-weight: 900; text-align: right; }
+    .help { position: fixed; z-index: 2; bottom: 18px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 36px); text-align: center; font-weight: 800; white-space: nowrap; }
+    #message { position: fixed; z-index: 3; top: 115px; left: 50%; transform: translateX(-50%); color: white; background: rgba(23,35,60,.9); border-radius: 999px; padding: 10px 18px; font-weight: 900; text-align: center; pointer-events: none; }
+    @media (max-width: 650px) { .hud { flex-direction: column; } .stats { text-align: left; } .help { white-space: normal; } #message { top: 180px; width: calc(100vw - 36px); } }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <section class="topbar">
-      <div class="brand">BLOCKY ADVENTURE</div>
-      <div class="stats"><span class="pill" id="score">Coins: 0 / 8</span><span class="pill" id="status">Find the coins</span></div>
-    </section>
-    <div class="game-wrap"><canvas id="game" width="960" height="540"></canvas><div class="message" id="message">Collect every coin, then reach the glowing portal!</div></div>
-    <div class="help">Move with WASD or arrow keys • Press Space to dash • Press R to restart</div>
-  </main>
+  <canvas id="game"></canvas>
+  <div class="hud">
+    <div class="card"><div class="title">BLOCKY ADVENTURE 3D</div><div class="subtitle">A tiny original block-world obby</div></div>
+    <div class="card stats"><div id="score">Crystals: 0 / 8</div><div id="status">Explore the world</div></div>
+  </div>
+  <div id="message">Collect every crystal, then enter the glowing portal!</div>
+  <div class="card help">WASD / arrows: move &nbsp; • &nbsp; Space: jump &nbsp; • &nbsp; R: restart</div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
   <script>
     const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
     const scoreText = document.getElementById("score");
     const statusText = document.getElementById("status");
     const message = document.getElementById("message");
-    const WORLD = { width: 2200, height: 1400 };
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x8fd8ff);
+    scene.fog = new THREE.Fog(0x8fd8ff, 55, 150);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 250);
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    scene.add(new THREE.HemisphereLight(0xdaf5ff, 0x507344, 2.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 3.2);
+    sun.position.set(-25, 35, 20); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
+
+    const mats = {
+      grass: new THREE.MeshStandardMaterial({ color: 0x73c95c, roughness: 0.9 }),
+      dirt: new THREE.MeshStandardMaterial({ color: 0x9a623c, roughness: 1 }),
+      purple: new THREE.MeshStandardMaterial({ color: 0x7664e8, roughness: 0.75 }),
+      pink: new THREE.MeshStandardMaterial({ color: 0xef6c8c, roughness: 0.75 }),
+      orange: new THREE.MeshStandardMaterial({ color: 0xf2a14b, roughness: 0.75 }),
+      teal: new THREE.MeshStandardMaterial({ color: 0x2ebd91, roughness: 0.75 }),
+      blue: new THREE.MeshStandardMaterial({ color: 0x4f7cff, roughness: 0.75 }),
+      gold: new THREE.MeshStandardMaterial({ color: 0xffd447, emissive: 0x6b4300, emissiveIntensity: 0.35, metalness: 0.5, roughness: 0.25 }),
+      portal: new THREE.MeshStandardMaterial({ color: 0x56ffd0, emissive: 0x159a78, emissiveIntensity: 1.2, metalness: 0.2, roughness: 0.2 }),
+      avatar: new THREE.MeshStandardMaterial({ color: 0x3854b5, roughness: 0.8 }),
+      skin: new THREE.MeshStandardMaterial({ color: 0xffcfad, roughness: 0.85 }),
+      hair: new THREE.MeshStandardMaterial({ color: 0x5b3a29, roughness: 0.9 })
+    };
+
+    const platforms = [];
+    function block(x, y, z, w, h, d, material) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+      mesh.position.set(x, y + h / 2, z); mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh);
+      platforms.push({ x: x, z: z, w: w, d: d, top: y + h });
+      return mesh;
+    }
+    block(0, -0.5, 0, 100, 1, 100, mats.grass);
+    block(-9, 0.5, -8, 10, 2, 5, mats.purple);
+    block(7, 1, -14, 10, 2, 5, mats.pink);
+    block(20, 1.5, -5, 8, 3, 8, mats.orange);
+    block(30, 2, -18, 10, 4, 6, mats.teal);
+    block(18, 0.5, 12, 13, 2, 6, mats.blue);
+    block(3, 1.5, 20, 10, 3, 7, mats.purple);
+    block(-15, 2, 16, 9, 4, 8, mats.orange);
+    block(-27, 1, 4, 10, 2, 7, mats.pink);
+    block(-32, 2, -15, 9, 4, 8, mats.teal);
+
+    const grid = new THREE.GridHelper(100, 50, 0x4d9a57, 0x91ce86);
+    grid.position.y = 0.02; scene.add(grid);
+
+    const player = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.35, 0.7), mats.avatar); body.position.y = 1.35; body.castShadow = true; player.add(body);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), mats.skin); head.position.y = 2.45; head.castShadow = true; player.add(head);
+    const hair = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.22, 0.94), mats.hair); hair.position.y = 2.88; hair.castShadow = true; player.add(hair);
+    const leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.8, 0.5), mats.avatar); leg1.position.set(-0.28, 0.4, 0); leg1.castShadow = true; player.add(leg1);
+    const leg2 = leg1.clone(); leg2.position.x = 0.28; player.add(leg2);
+    player.position.set(0, 0, 18); scene.add(player);
+
+    const crystalSpots = [[-8, -8, 3], [7, -14, 4], [20, -5, 5], [30, -18, 7], [18, 12, 4], [3, 20, 5], [-15, 16, 7], [-27, 4, 4]];
+    const crystals = [];
+    crystalSpots.forEach(function (spot) {
+      const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.7, 0), mats.gold);
+      crystal.position.set(spot[0], spot[2] + 1.1, spot[1]); crystal.castShadow = true; scene.add(crystal);
+      crystals.push({ mesh: crystal, collected: false });
+    });
+
+    const portal = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.28, 14, 40), mats.portal);
+    ring.rotation.x = Math.PI / 2; portal.add(ring);
+    const portalCore = new THREE.Mesh(new THREE.CircleGeometry(1.9, 32), new THREE.MeshBasicMaterial({ color: 0x173b63, transparent: true, opacity: 0.78 }));
+    portalCore.rotation.x = -Math.PI / 2; portalCore.position.y = 0.02; portal.add(portalCore);
+    portal.position.set(30, 0, 25); scene.add(portal);
+
     const keys = {};
-    const camera = { x: 0, y: 0 };
-    const player = { x: 130, y: 180, w: 34, h: 48, speed: 4.2, dash: 0 };
-    const walls = [
-      { x: 0, y: 0, w: WORLD.width, h: 34, color: "#5b6a9b" }, { x: 0, y: WORLD.height - 34, w: WORLD.width, h: 34, color: "#5b6a9b" },
-      { x: 0, y: 0, w: 34, h: WORLD.height, color: "#5b6a9b" }, { x: WORLD.width - 34, y: 0, w: 34, h: WORLD.height, color: "#5b6a9b" },
-      { x: 300, y: 180, w: 460, h: 48, color: "#6c5ce7" }, { x: 300, y: 180, w: 48, h: 340, color: "#6c5ce7" },
-      { x: 1040, y: 120, w: 52, h: 430, color: "#ef6c8c" }, { x: 1040, y: 500, w: 420, h: 52, color: "#ef6c8c" },
-      { x: 1540, y: 220, w: 430, h: 48, color: "#2ebd91" }, { x: 1920, y: 220, w: 50, h: 320, color: "#2ebd91" },
-      { x: 480, y: 820, w: 600, h: 50, color: "#f19b45" }, { x: 1030, y: 820, w: 50, h: 300, color: "#f19b45" },
-      { x: 1380, y: 930, w: 460, h: 50, color: "#6c5ce7" }, { x: 1790, y: 930, w: 50, h: 260, color: "#6c5ce7" },
-      { x: 150, y: 1030, w: 380, h: 48, color: "#2ebd91" }
-    ];
-    const coinSpots = [[180, 340], [600, 330], [900, 170], [1240, 300], [1670, 390], [700, 690], [1220, 1030], [1640, 1130]];
-    let coins = [];
+    let velocityY = 0;
+    let grounded = true;
     let won = false;
+    const clock = new THREE.Clock();
+    const playerSpeed = 8;
+
     function reset() {
-      player.x = 130; player.y = 80; player.dash = 0;
-      coins = coinSpots.map(function (spot) { return { x: spot[0], y: spot[1], collected: false }; });
-      won = false; message.textContent = "Collect every coin, then reach the glowing portal!"; message.style.display = "block"; statusText.textContent = "Find the coins"; updateScore();
+      player.position.set(0, 0, 18); velocityY = 0; grounded = true; won = false;
+      crystals.forEach(function (crystal) { crystal.collected = false; crystal.mesh.visible = true; });
+      scoreText.textContent = "Crystals: 0 / " + crystals.length;
+      statusText.textContent = "Explore the world";
+      message.textContent = "Collect every crystal, then enter the glowing portal!";
+      message.style.display = "block";
     }
-    function updateScore() {
-      const collected = coins.filter(function (coin) { return coin.collected; }).length;
-      scoreText.textContent = "Coins: " + collected + " / " + coins.length;
-      if (collected === coins.length && !won) { statusText.textContent = "Portal unlocked!"; message.textContent = "Portal unlocked! Find the glowing green square."; }
+    function onPlatform(x, z, feetY) {
+      return platforms.some(function (p) { return Math.abs(x - p.x) < p.w / 2 - 0.45 && Math.abs(z - p.z) < p.d / 2 - 0.45 && feetY <= p.top + 0.12 && feetY >= p.top - 0.55; });
     }
-    function overlaps(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
-    function blocked(x, y) { const body = { x: x, y: y, w: player.w, h: player.h }; return walls.some(function (wall) { return overlaps(body, wall); }); }
-    function movePlayer(dx, dy) {
-      const nextX = player.x + dx; if (!blocked(nextX, player.y)) player.x = nextX;
-      const nextY = player.y + dy; if (!blocked(player.x, nextY)) player.y = nextY;
+    function collectCrystals() {
+      let total = 0;
+      crystals.forEach(function (crystal) {
+        if (!crystal.collected && player.position.distanceTo(crystal.mesh.position) < 2.1) { crystal.collected = true; crystal.mesh.visible = false; }
+        if (crystal.collected) total += 1;
+      });
+      scoreText.textContent = "Crystals: " + total + " / " + crystals.length;
+      if (total === crystals.length && !won) { statusText.textContent = "Portal unlocked!"; message.textContent = "Portal unlocked! Walk into the glowing ring."; }
     }
-    function update() {
+    function update(dt) {
       if (won) return;
-      let dx = 0; let dy = 0;
-      if (keys.ArrowLeft || keys.a) dx -= 1; if (keys.ArrowRight || keys.d) dx += 1; if (keys.ArrowUp || keys.w) dy -= 1; if (keys.ArrowDown || keys.s) dy += 1;
-      const length = Math.hypot(dx, dy) || 1; const boost = player.dash > 0 ? 2.2 : 1;
-      movePlayer((dx / length) * player.speed * boost, (dy / length) * player.speed * boost); if (player.dash > 0) player.dash -= 1;
-      coins.forEach(function (coin) { if (!coin.collected && Math.hypot(player.x + player.w / 2 - coin.x, player.y + player.h / 2 - coin.y) < 34) { coin.collected = true; updateScore(); } });
-      const collectedAll = coins.every(function (coin) { return coin.collected; }); const portal = { x: 2030, y: 1080, w: 100, h: 100 };
-      if (collectedAll && overlaps(player, portal)) { won = true; statusText.textContent = "You win!"; message.textContent = "You finished the obby! Press R to play again."; }
+      let x = 0; let z = 0;
+      if (keys.ArrowLeft || keys.a) x -= 1; if (keys.ArrowRight || keys.d) x += 1; if (keys.ArrowUp || keys.w) z -= 1; if (keys.ArrowDown || keys.s) z += 1;
+      const length = Math.hypot(x, z) || 1;
+      if (x || z) { x /= length; z /= length; player.position.x += x * playerSpeed * dt; player.position.z += z * playerSpeed * dt; player.rotation.y = Math.atan2(x, z); }
+      player.position.x = Math.max(-46, Math.min(46, player.position.x)); player.position.z = Math.max(-46, Math.min(46, player.position.z));
+      velocityY -= 24 * dt; player.position.y += velocityY * dt;
+      if (velocityY <= 0 && onPlatform(player.position.x, player.position.z, player.position.y)) { player.position.y = platforms.find(function (p) { return Math.abs(player.position.x - p.x) < p.w / 2 - 0.45 && Math.abs(player.position.z - p.z) < p.d / 2 - 0.45 && player.position.y <= p.top + 0.12 && player.position.y >= p.top - 0.55; }).top; velocityY = 0; grounded = true; } else { grounded = false; }
+      collectCrystals(); portal.rotation.y += dt * 1.5; ring.rotation.z += dt * 0.8;
+      const unlocked = crystals.every(function (crystal) { return crystal.collected; });
+      if (unlocked && player.position.distanceTo(portal.position) < 3.5) { won = true; statusText.textContent = "You win!"; message.textContent = "You finished the 3D obby! Press R to play again."; }
+      crystals.forEach(function (crystal, index) { if (!crystal.collected) { crystal.mesh.rotation.y += dt * 2.4; crystal.mesh.position.y += Math.sin(clock.elapsedTime * 3 + index) * 0.003; } });
     }
-    function drawWorld() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const sky = ctx.createLinearGradient(0, 0, 0, canvas.height); sky.addColorStop(0, "#8ed8ff"); sky.addColorStop(1, "#d9f5ff"); ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.save(); ctx.translate(-camera.x, -camera.y); ctx.fillStyle = "#b9e6a2"; ctx.fillRect(0, 0, WORLD.width, WORLD.height);
-      ctx.strokeStyle = "rgba(69, 117, 92, .18)"; ctx.lineWidth = 2;
-      for (let x = 40; x < WORLD.width; x += 80) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD.height); ctx.stroke(); }
-      for (let y = 40; y < WORLD.height; y += 80) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD.width, y); ctx.stroke(); }
-      walls.forEach(function (wall) { ctx.fillStyle = "rgba(23, 35, 60, .22)"; ctx.fillRect(wall.x + 9, wall.y + 10, wall.w, wall.h); ctx.fillStyle = wall.color; ctx.fillRect(wall.x, wall.y, wall.w, wall.h); ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.fillRect(wall.x, wall.y, wall.w, 8); });
-      const collectedAll = coins.every(function (coin) { return coin.collected; }); const portal = { x: 2030, y: 1080, w: 100, h: 100 };
-      ctx.fillStyle = collectedAll ? "#4dffbd" : "#78909c"; ctx.fillRect(portal.x, portal.y, portal.w, portal.h); ctx.strokeStyle = "#17233c"; ctx.lineWidth = 6; ctx.strokeRect(portal.x, portal.y, portal.w, portal.h); ctx.fillStyle = "#17233c"; ctx.font = "bold 18px system-ui"; ctx.fillText(collectedAll ? "GO!" : "LOCKED", portal.x + 18, portal.y + 58);
-      coins.forEach(function (coin) { if (coin.collected) return; ctx.fillStyle = "rgba(23,35,60,.2)"; ctx.beginPath(); ctx.ellipse(coin.x, coin.y + 17, 18, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "#ffd447"; ctx.beginPath(); ctx.arc(coin.x, coin.y, 17, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "#b57900"; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = "#fff6b0"; ctx.font = "bold 15px system-ui"; ctx.fillText("$", coin.x - 5, coin.y + 6); });
-      ctx.fillStyle = "rgba(23,35,60,.25)"; ctx.fillRect(player.x + 4, player.y + player.h - 2, player.w + 4, 10); ctx.fillStyle = "#263b7a"; ctx.fillRect(player.x + 4, player.y + 25, 28, 23); ctx.fillStyle = "#ffcfad"; ctx.fillRect(player.x + 6, player.y, 24, 24); ctx.fillStyle = "#5b3a29"; ctx.fillRect(player.x + 5, player.y, 26, 8); ctx.fillStyle = "#263b7a"; ctx.fillRect(player.x + 5, player.y + 46, 9, 11); ctx.fillRect(player.x + 22, player.y + 46, 9, 11); ctx.fillStyle = "#17233c"; ctx.fillRect(player.x + 12, player.y + 12, 4, 4); ctx.fillRect(player.x + 22, player.y + 12, 4, 4);
-      ctx.restore();
+    function animate() {
+      const dt = Math.min(clock.getDelta(), 0.05); update(dt);
+      const target = new THREE.Vector3(player.position.x, player.position.y + 1.1, player.position.z);
+      const desired = new THREE.Vector3(player.position.x + 10, player.position.y + 8, player.position.z + 13);
+      camera.position.lerp(desired, 1 - Math.pow(0.001, dt)); camera.lookAt(target);
+      renderer.render(scene, camera); requestAnimationFrame(animate);
     }
-    function loop() { update(); camera.x = Math.max(0, Math.min(WORLD.width - canvas.width, player.x - canvas.width / 2)); camera.y = Math.max(0, Math.min(WORLD.height - canvas.height, player.y - canvas.height / 2)); drawWorld(); requestAnimationFrame(loop); }
-    window.addEventListener("keydown", function (event) { keys[event.key] = true; if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)) event.preventDefault(); if (event.key === " ") player.dash = 18; if (event.key.toLowerCase() === "r") reset(); });
+    window.addEventListener("keydown", function (event) {
+      keys[event.key] = true;
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)) event.preventDefault();
+      if (event.key === " " && grounded && !won) { velocityY = 10; grounded = false; }
+      if (event.key.toLowerCase() === "r") reset();
+    });
     window.addEventListener("keyup", function (event) { keys[event.key] = false; });
-    reset(); loop();
+    window.addEventListener("resize", function () { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+    reset(); animate();
   </script>
 </body>
 </html>
